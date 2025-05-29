@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字去重工具</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .glass-effect {
+            backdrop-filter: blur(16px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.75);
+            border: 1px solid rgba(209, 213, 219, 0.3);
+        }
+        .bg-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gradient min-h-screen">
+    <div id="app">
+        <div class="container mx-auto px-4 py-8">
+            <!-- 标题区域 -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-white mb-2">
+                    <i class="fas fa-text-width mr-3"></i>
+                    文字去重工具
+                </h1>
+                <p class="text-white opacity-80">智能处理中英文混合文本，支持去重和随机打乱</p>
+            </div>
+
+            <!-- 主要内容区域 -->
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-effect rounded-2xl p-8 shadow-2xl">
+                    <!-- 输入区域 -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-lg font-semibold mb-3">
+                            <i class="fas fa-edit mr-2"></i>
+                            请输入要处理的文本
+                        </label>
+                        <textarea 
+                            v-model="inputText" 
+                            @input="updateStats"
+                            class="w-full h-64 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 resize-none text-gray-700 leading-relaxed"
+                            placeholder="在这里输入您的文本...&#10;&#10;例如：&#10;你好世界 hello world &#10;重复的文字 repeated text&#10;测试数据 test data"
+                        ></textarea>
+                    </div>
+
+                    <!-- 统计信息 -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-gray-200">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                                <div class="text-2xl font-bold text-blue-600">{{ stats.totalCount }}</div>
+                                <div class="text-sm text-gray-600">总计</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                                <div class="text-2xl font-bold text-green-600">{{ stats.chineseCount }}</div>
+                                <div class="text-sm text-gray-600">中文字符</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                                <div class="text-2xl font-bold text-purple-600">{{ stats.englishCount }}</div>
+                                <div class="text-sm text-gray-600">英文单词</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <button 
+                            @click="deduplicateTextNoSpace"
+                            :disabled="!inputText.trim()"
+                            class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-lg disabled:cursor-not-allowed"
+                        >
+                            <i class="fas fa-compress-alt mr-2"></i>
+                            去重不留位
+                        </button>
+                        <button 
+                            @click="deduplicateTextWithSpace"
+                            :disabled="!inputText.trim()"
+                            class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-lg disabled:cursor-not-allowed"
+                        >
+                            <i class="fas fa-filter mr-2"></i>
+                            去重留位
+                        </button>
+                    </div>
+
+                    <!-- 结果区域 -->
+                    <div v-if="outputText" class="mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="text-gray-700 text-lg font-semibold">
+                                <i class="fas fa-check-circle mr-2 text-green-500"></i>
+                                处理结果
+                            </label>
+                            <div class="flex gap-2">
+                                <button 
+                                    @click="shuffleText"
+                                    :disabled="!inputText.trim() && !outputText.trim()"
+                                    class="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg transition-all duration-300 text-sm transform hover:scale-105 disabled:scale-100"
+                                >
+                                    <i class="fas fa-random mr-1"></i>
+                                    随机打乱
+                                </button>
+                                <button 
+                                    @click="copyToClipboard"
+                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors duration-300 text-sm"
+                                >
+                                    <i class="fas fa-copy mr-1"></i>
+                                    复制结果
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 border-2 border-gray-200 rounded-xl p-4 min-h-32 max-h-64 overflow-y-auto">
+                            <pre class="whitespace-pre-wrap text-gray-700 leading-relaxed">{{ outputText }}</pre>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            字符串长度：{{ outputText.length }}，字数：{{ outputStats.totalCount }}
+                            <span v-if="outputStats.removedCount > 0" class="text-red-500 ml-2">
+                                (已移除 {{ outputStats.removedCount }} 个重复项)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 使用说明 -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <h3 class="text-yellow-800 font-semibold mb-2">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            使用说明
+                        </h3>
+                        <ul class="text-yellow-700 text-sm space-y-1">
+                            <li>• 中文按单字处理，英文按单词处理</li>
+                            <li>• <strong>去重不留位</strong>：直接删除重复项，结果紧密连接</li>
+                            <li>• <strong>去重留位</strong>：删除重复项，在被删除位置留空格占位</li>
+                            <li>• <strong>随机打乱</strong>：优先打乱结果内容，无结果时打乱输入内容</li>
+                            <li>• 支持中英文混合文本处理</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息提示 -->
+        <div v-if="message" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300">
+            <i class="fas fa-check mr-2"></i>
+            {{ message }}
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed } = Vue;
+
+        createApp({
+            setup() {
+                const inputText = ref('');
+                const outputText = ref('');
+                const message = ref('');
+                const stats = reactive({
+                    totalCount: 0,
+                    chineseCount: 0,
+                    englishCount: 0
+                });
+                const outputStats = reactive({
+                    totalCount: 0,
+                    removedCount: 0
+                });
+
+                // 解析文本为字符和单词数组
+                function parseText(text) {
+                    const result = [];
+                    let i = 0;
+                    
+                    while (i < text.length) {
+                        const char = text[i];
+                        
+                        // 检查是否是中文字符
+                        if (/[\u4e00-\u9fff]/.test(char)) {
+                            result.push(char);
+                            i++;
+                        }
+                        // 检查是否是英文字母
+                        else if (/[a-zA-Z]/.test(char)) {
+                            let word = '';
+                            while (i < text.length && /[a-zA-Z0-9]/.test(text[i])) {
+                                word += text[i];
+                                i++;
+                            }
+                            if (word) {
+                                result.push(word.toLowerCase());
+                            }
+                        }
+                        // 其他字符（包括标点、空格等）单独处理
+                        else if (/\S/.test(char)) {
+                            result.push(char);
+                            i++;
+                        }
+                        else {
+                            i++; // 跳过空白字符
+                        }
+                    }
+                    
+                    return result;
+                }
+
+                // 更新统计信息
+                function updateStats() {
+                    const parsed = parseText(inputText.value);
+                    stats.totalCount = parsed.length;
+                    stats.chineseCount = parsed.filter(item => /[\u4e00-\u9fff]/.test(item)).length;
+                    stats.englishCount = parsed.filter(item => /^[a-zA-Z]/.test(item)).length;
+                }
+
+                // 去重功能（留位）
+                function deduplicateTextWithSpace() {
+                    if (!inputText.value.trim()) return;
+                    
+                    const parsed = parseText(inputText.value);
+                    const originalCount = parsed.length;
+                    const seen = new Set();
+                    const result = [];
+                    let removedCount = 0;
+                    
+                    for (const item of parsed) {
+                        if (!seen.has(item)) {
+                            seen.add(item);
+                            result.push(item);
+                        } else {
+                            // 被删除的位置留空格占位
+                            result.push(' ');
+                            removedCount++;
+                        }
+                    }
+                    
+                    outputText.value = result.join('');
+                    outputStats.totalCount = result.length;
+                    outputStats.removedCount = removedCount;
+                    
+                    showMessage('去重处理完成（留位）！');
+                }
+
+                // 去重功能（不留位）
+                function deduplicateTextNoSpace() {
+                    if (!inputText.value.trim()) return;
+                    
+                    const parsed = parseText(inputText.value);
+                    const originalCount = parsed.length;
+                    const seen = new Set();
+                    const deduplicated = [];
+                    
+                    for (const item of parsed) {
+                        if (!seen.has(item)) {
+                            seen.add(item);
+                            deduplicated.push(item);
+                        }
+                    }
+                    
+                    outputText.value = deduplicated.join('');
+                    outputStats.totalCount = deduplicated.length;
+                    outputStats.removedCount = originalCount - deduplicated.length;
+                    
+                    showMessage('去重处理完成（不留位）！');
+                }
+
+                // 打乱功能
+                function shuffleText() {
+                    let textToShuffle = '';
+                    let sourceText = '';
+                    
+                    // 优先处理结果内容，如果没有结果则处理输入内容
+                    if (outputText.value.trim()) {
+                        textToShuffle = outputText.value;
+                        sourceText = '结果';
+                    } else if (inputText.value.trim()) {
+                        textToShuffle = inputText.value;
+                        sourceText = '输入';
+                    } else {
+                        return;
+                    }
+                    
+                    const parsed = parseText(textToShuffle);
+                    const shuffled = [...parsed];
+                    
+                    // Fisher-Yates 洗牌算法
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+                    
+                    outputText.value = shuffled.join('');
+                    outputStats.totalCount = shuffled.length;
+                    outputStats.removedCount = 0;
+                    
+                    showMessage(`随机打乱完成（处理${sourceText}内容）！`);
+                }
+
+                // 复制到剪贴板
+                async function copyToClipboard() {
+                    try {
+                        await navigator.clipboard.writeText(outputText.value);
+                        showMessage('已复制到剪贴板！');
+                    } catch (err) {
+                        // 降级方案
+                        const textArea = document.createElement('textarea');
+                        textArea.value = outputText.value;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        showMessage('已复制到剪贴板！');
+                    }
+                }
+
+                // 显示消息
+                function showMessage(msg) {
+                    message.value = msg;
+                    setTimeout(() => {
+                        message.value = '';
+                    }, 3000);
+                }
+
+                return {
+                    inputText,
+                    outputText,
+                    message,
+                    stats,
+                    outputStats,
+                    updateStats,
+                    deduplicateTextNoSpace,
+                    deduplicateTextWithSpace,
+                    shuffleText,
+                    copyToClipboard
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
