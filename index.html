@@ -49,7 +49,11 @@
 
                     <!-- 统计信息 -->
                     <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-gray-200">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div class="bg-white rounded-lg p-3 shadow-sm">
+                                <div class="text-2xl font-bold text-orange-600">{{ stats.stringLength }}</div>
+                                <div class="text-sm text-gray-600">字符串长度</div>
+                            </div>
                             <div class="bg-white rounded-lg p-3 shadow-sm">
                                 <div class="text-2xl font-bold text-blue-600">{{ stats.totalCount }}</div>
                                 <div class="text-sm text-gray-600">总计</div>
@@ -155,6 +159,7 @@
                 const outputText = ref('');
                 const message = ref('');
                 const stats = reactive({
+                    stringLength: 0,
                     totalCount: 0,
                     chineseCount: 0,
                     englishCount: 0
@@ -207,6 +212,7 @@
                     stats.totalCount = parsed.length;
                     stats.chineseCount = parsed.filter(item => /[\u4e00-\u9fff]/.test(item)).length;
                     stats.englishCount = parsed.filter(item => /^[a-zA-Z]/.test(item)).length;
+                    stats.stringLength = inputText.value.length;
                 }
 
                 // 去重功能（留位）
