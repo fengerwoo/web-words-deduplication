@@ -89,6 +89,34 @@
                         </button>
                     </div>
 
+                    <!-- 全英文分隔设置 -->
+                    <div class="mb-6 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-blue-800 text-sm font-semibold mb-1">
+                                    <i class="fas fa-gear mr-1"></i>
+                                    全英文时，结果分隔方式(默认为1个空格)
+                                </label>
+                                <input 
+                                    v-model="englishSeparator"
+                                    class="w-full px-3 py-1.5 border border-blue-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all duration-300 text-sm"
+                                    placeholder="默认为1个空格"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-blue-800 text-sm font-semibold mb-1">
+                                    <i class="fas fa-gear mr-1"></i>
+                                    留位符(默认为_符号)
+                                </label>
+                                <input 
+                                    v-model="placeholder"
+                                    class="w-full px-3 py-1.5 border border-blue-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all duration-300 text-sm"
+                                    placeholder="默认为_"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 结果区域 -->
                     <div v-if="outputText" class="mb-6">
                         <div class="flex justify-between items-center mb-3">
@@ -134,8 +162,9 @@
                         <ul class="text-yellow-700 text-sm space-y-1">
                             <li>• 中文按单字处理，英文按单词处理</li>
                             <li>• <strong>去重不留位</strong>：直接删除重复项，结果紧密连接</li>
-                            <li>• <strong>去重留位</strong>：删除重复项，在被删除位置留空格占位</li>
+                            <li>• <strong>去重留位</strong>：删除重复项，使用留位符替换（默认_）</li>
                             <li>• <strong>随机打乱</strong>：优先打乱结果内容，无结果时打乱输入内容</li>
+                            <li>• <strong>纯英文内容</strong>：使用自定义分隔符连接单词（默认空格）</li>
                             <li>• 支持中英文混合文本处理</li>
                         </ul>
                     </div>
@@ -168,6 +197,8 @@
                     totalCount: 0,
                     removedCount: 0
                 });
+                const englishSeparator = ref(' ');
+                const placeholder = ref('_');
 
                 // 解析文本为字符和单词数组
                 function parseText(text) {
@@ -206,6 +237,20 @@
                     return result;
                 }
 
+                // 判断文本是否为纯英文
+                function isAllEnglish(text) {
+                    const cleaned = text.replace(/\s+/g, ''); // 去除空格
+                    return /^[a-zA-Z0-9\p{P}]*$/u.test(cleaned) && /[a-zA-Z]/.test(cleaned);
+                }
+
+                // 根据内容类型选择分隔符
+                function getSeparator(parsed, isAllEng) {
+                    if (isAllEng) {
+                        return englishSeparator.value || ' ';
+                    }
+                    return '';
+                }
+
                 // 更新统计信息
                 function updateStats() {
                     const parsed = parseText(inputText.value);
@@ -219,24 +264,28 @@
                 function deduplicateTextWithSpace() {
                     if (!inputText.value.trim()) return;
                     
+                    const isAllEng = isAllEnglish(inputText.value);
                     const parsed = parseText(inputText.value);
                     const originalCount = parsed.length;
                     const seen = new Set();
                     const result = [];
                     let removedCount = 0;
                     
+                    const placeholderChar = placeholder.value || '_';
+                    
                     for (const item of parsed) {
                         if (!seen.has(item)) {
                             seen.add(item);
                             result.push(item);
                         } else {
-                            // 被删除的位置留空格占位
-                            result.push(' ');
+                            // 被删除的位置使用留位符替换
+                            result.push(placeholderChar);
                             removedCount++;
                         }
                     }
                     
-                    outputText.value = result.join('');
+                    const separator = getSeparator(result, isAllEng);
+                    outputText.value = result.join(separator);
                     outputStats.totalCount = result.length;
                     outputStats.removedCount = removedCount;
                     
@@ -247,6 +296,7 @@
                 function deduplicateTextNoSpace() {
                     if (!inputText.value.trim()) return;
                     
+                    const isAllEng = isAllEnglish(inputText.value);
                     const parsed = parseText(inputText.value);
                     const originalCount = parsed.length;
                     const seen = new Set();
@@ -259,7 +309,8 @@
                         }
                     }
                     
-                    outputText.value = deduplicated.join('');
+                    const separator = getSeparator(deduplicated, isAllEng);
+                    outputText.value = deduplicated.join(separator);
                     outputStats.totalCount = deduplicated.length;
                     outputStats.removedCount = originalCount - deduplicated.length;
                     
@@ -282,7 +333,22 @@
                         return;
                     }
                     
-                    const parsed = parseText(textToShuffle);
+                    const isAllEng = isAllEnglish(textToShuffle);
+                    let parsed;
+                    
+                    // 如果是处理结果且为全英文，检查是否包含分隔符
+                    if (sourceText === '结果' && isAllEng && englishSeparator.value) {
+                        const separator = englishSeparator.value;
+                        // 如果结果中包含分隔符，按分隔符分割而不是重新解析
+                        if (textToShuffle.includes(separator)) {
+                            parsed = textToShuffle.split(separator).filter(item => item.trim() !== '');
+                        } else {
+                            parsed = parseText(textToShuffle);
+                        }
+                    } else {
+                        parsed = parseText(textToShuffle);
+                    }
+                    
                     const shuffled = [...parsed];
                     
                     // Fisher-Yates 洗牌算法
@@ -291,7 +357,8 @@
                         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
                     }
                     
-                    outputText.value = shuffled.join('');
+                    const separator = getSeparator(shuffled, isAllEng);
+                    outputText.value = shuffled.join(separator);
                     outputStats.totalCount = shuffled.length;
                     outputStats.removedCount = 0;
                     
@@ -329,6 +396,8 @@
                     message,
                     stats,
                     outputStats,
+                    englishSeparator,
+                    placeholder,
                     updateStats,
                     deduplicateTextNoSpace,
                     deduplicateTextWithSpace,
